@@ -1,6 +1,6 @@
 package com.voiceDesk.demo.controller;
 
-import com.voiceDesk.demo.model.Appointment;
+import com.voiceDesk.demo.entity.Appointment;
 import com.voiceDesk.demo.repository.AppointmentRepository;
 import org.springframework.web.bind.annotation.*;
 

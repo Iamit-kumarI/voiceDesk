@@ -23,7 +23,7 @@ public class CallService {
         Call.creator(
                 new PhoneNumber(toNumber),
                 new PhoneNumber(FROM_NUMBER),
-                URI.create("https://774b-103-175-180-55.ngrok-free.app/voice")
+                URI.create("https://0d11-103-175-180-89.ngrok-free.app/voice")
         ).create();
     }
 }
