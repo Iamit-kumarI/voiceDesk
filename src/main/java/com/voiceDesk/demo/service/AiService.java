@@ -1,5 +1,6 @@
 package com.voiceDesk.demo.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 
 import java.io.BufferedReader;
@@ -7,9 +8,13 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 public class AiService {
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public String extractDetails(String message) {
         try {
@@ -21,25 +26,24 @@ public class AiService {
             conn.setDoOutput(true);
 
             String prompt = """
-                Extract details from this message and return JSON only:
+                Extract details from this message and return ONLY a raw JSON object, no explanation, no markdown:
                 message: "%s"
 
-                format:
+                Return exactly this format:
                 {
-                  "name": "",
-                  "phone": "",
+                  "customerName": "",
+                  "phoneNumber": "",
                   "date": "",
                   "time": ""
                 }
-                """.formatted(message);
+                """.formatted(message.replace("\"", "\\\""));
 
-            String body = """
-                {
-                  "model": "llama3",
-                  "prompt": %s,
-                  "stream": false
-                }
-                """.formatted("\"" + prompt.replace("\"", "\\\"") + "\"");
+            // Use Jackson to safely build the JSON body — no manual string escaping
+            Map<String, Object> requestBody = new HashMap<>();
+            requestBody.put("model", "llama3");
+            requestBody.put("prompt", prompt);
+            requestBody.put("stream", false);
+            String body = objectMapper.writeValueAsString(requestBody);
 
             try (OutputStream os = conn.getOutputStream()) {
                 os.write(body.getBytes());
@@ -51,11 +55,9 @@ public class AiService {
 
             StringBuilder response = new StringBuilder();
             String line;
-
             while ((line = br.readLine()) != null) {
                 response.append(line);
             }
-
             return response.toString();
 
         } catch (Exception e) {

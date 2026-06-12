@@ -7,7 +7,6 @@ import com.voiceDesk.demo.model.AppointmentDto;
 import com.voiceDesk.demo.repository.AppointmentDtoRepository;
 import com.voiceDesk.demo.repository.AppointmentRepository;
 import com.voiceDesk.demo.service.AiService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -16,22 +15,10 @@ import org.springframework.web.bind.annotation.RestController;
 public class VoiceController {
 
     private final AppointmentRepository appointmentRepository;
+    private final AppointmentDtoRepository dtoRepo;
+    private final ObjectMapper objectMapper;
+    private final AiService aiService;
 
-//    public VoiceController(AppointmentRepository appointmentRepository) {
-//        this.appointmentRepository = appointmentRepository;
-//    }
-    @PostMapping(value = "/voice", produces = "application/xml")
-    public String voice() {
-        return """
-        <Response>
-            <Gather input="speech" 
-            action="https://254a-103-94-67-27.ngrok-free.app/process" 
-            method="POST">
-                <Say>Hello! Please tell me your name, And Meeting Details/Say>
-            </Gather>
-        </Response>
-        """;
-    }
     public VoiceController(
             AppointmentRepository appointmentRepository,
             AppointmentDtoRepository dtoRepo,
@@ -43,17 +30,22 @@ public class VoiceController {
         this.objectMapper = objectMapper;
         this.aiService = aiService;
     }
-    @Autowired
-    private AppointmentRepository repo;
 
-    @Autowired
-    private AppointmentDtoRepository dtoRepo;
+    @PostMapping(value = "/voice", produces = "application/xml")
+    public String voice() {
+        return """
+        <Response>
+            <Gather input="speech"
+            action="https://8928-151-158-52-167.ngrok-free.app/process"
+            method="POST"
+            timeout="10">
+                <Say>Hello! Please tell me your name and meeting details.</Say>
+            </Gather>
+            <Say>We did not receive any input. Goodbye.</Say>
+        </Response>
+        """;
+    }
 
-    @Autowired
-    private AiService aiService;
-
-    @Autowired
-    private ObjectMapper objectMapper;
     @PostMapping(value = "/process", produces = "application/xml")
     public String process(@RequestParam("SpeechResult") String speech) {
 
@@ -67,9 +59,26 @@ public class VoiceController {
 
             // 2. Call AI
             String aiResponse = aiService.extractDetails(speech);
+            System.out.println("AI raw response: " + aiResponse);
 
+            // 3. Parse Ollama wrapper: {"response": "...json..."}
             JsonNode root = objectMapper.readTree(aiResponse);
             String jsonText = root.get("response").asText();
+
+            // 4. Strip markdown code fences if llama3 added them
+            jsonText = jsonText.trim();
+            if (jsonText.startsWith("```")) {
+                jsonText = jsonText.replaceAll("(?s)^```[a-zA-Z]*\\n?", "").replaceAll("```$", "").trim();
+            }
+
+            // 5. Extract just the JSON object in case there's extra text around it
+            int start = jsonText.indexOf('{');
+            int end = jsonText.lastIndexOf('}');
+            if (start != -1 && end != -1) {
+                jsonText = jsonText.substring(start, end + 1);
+            }
+
+            System.out.println("Parsed JSON: " + jsonText);
 
             AppointmentDto dto = objectMapper.readValue(jsonText, AppointmentDto.class);
             dtoRepo.save(dto);
@@ -77,7 +86,6 @@ public class VoiceController {
         } catch (Exception e) {
             e.printStackTrace();
 
-            // IMPORTANT: Always return valid XML even on error
             return """
         <Response>
             <Say>Sorry, something went wrong. Please try again.</Say>
@@ -87,7 +95,7 @@ public class VoiceController {
 
         return """
     <Response>
-        <Say>Thank you! Your appointment is recorded.</Say>
+        <Say>Thank you! Your appointment has been recorded.</Say>
     </Response>
     """;
     }
