@@ -1,9 +1,9 @@
 package com.voiceDesk.demo.service;
 
 import com.voiceDesk.demo.config.EnvConfig;
-import jakarta.mail.Authenticator;
-import jakarta.mail.PasswordAuthentication;
-import jakarta.mail.Session;
+import jakarta.mail.*;
+import jakarta.mail.internet.InternetAddress;
+import jakarta.mail.internet.MimeMessage;
 import org.springframework.stereotype.Service;
 
 import java.util.Properties;
@@ -27,5 +27,16 @@ public class EmailService {
                         );
                     }
         });
+        try{
+            Message message=new MimeMessage(session);
+            message.setFrom(new InternetAddress(EnvConfig.GmailUserName));
+            message.setRecipients(Message.RecipientType.TO,InternetAddress.parse(toEmail));
+            message.setSubject("Appointment Confirmed");
+            message.setText("Your Appointment Has been confirmed");
+            Transport.send(message);
+            System.out.println("Email Send Successfully");
+        }catch(Exception e){
+            e.printStackTrace();
+        }
     }
 }
